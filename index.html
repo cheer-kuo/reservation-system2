@@ -3,8 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <title>大貨梯及裝卸碼頭預約系統</title>
-  <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css' rel='stylesheet' />
-  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     h1 { text-align: center; }
@@ -14,17 +12,10 @@
     .hidden { display: none; }
     table { border-collapse: collapse; width: 100%; margin-top: 10px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    #calendar {
-      max-width: 900px;
-      margin: 40px auto;
-      height: 650px;
-    }
   </style>
 </head>
 <body>
   <h1>大貨梯及裝卸碼頭預約系統</h1>
-
-  <div id="calendar"></div>
 
   <div class="form-section">
     <h2>新增預約</h2>
@@ -35,12 +26,8 @@
       </select>
     </label>
     <label>日期: <input type="date" id="date"></label>
-    <label>開始時間:
-      <select id="startTime"></select>
-    </label>
-    <label>結束時間:
-      <select id="endTime"></select>
-    </label>
+    <label>開始時間: <select id="startTime"></select></label>
+    <label>結束時間: <select id="endTime"></select></label>
     <label>使用單位: <input type="text" id="unit"></label>
     <label>預約者: <input type="text" id="reserver"></label>
     <label>聯絡人電話: <input type="text" id="phone"></label>
@@ -116,7 +103,6 @@
       reservations.push({venue, date, start, end, unit, reserver, phone, resPassword});
       localStorage.setItem('reservations', JSON.stringify(reservations));
       renderAll();
-      renderCalendar();
       if (isAdmin) renderAdmin();
     }
 
@@ -163,7 +149,6 @@
 
       localStorage.setItem('reservations', JSON.stringify(reservations));
       renderAll();
-      renderCalendar();
       if (isAdmin) renderAdmin();
     }
 
@@ -211,32 +196,11 @@
       reservations.splice(i,1);
       localStorage.setItem('reservations', JSON.stringify(reservations));
       renderAll();
-      renderCalendar();
       renderAdmin();
     }
 
-    let calendar;
-    function renderCalendar() {
-      const calendarEl = document.getElementById('calendar');
-      if (calendar) calendar.destroy();
-      const events = reservations.map(r => ({
-        title: `${r.venue} (${r.unit})`,
-        start: `${r.date}T${r.start}`,
-        end: `${r.date}T${r.end}`
-      }));
-      calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        height: 'auto',
-        events: events
-      });
-      calendar.render();
-    }
-
-    window.onload = function() {
-      generateTimeOptions();
-      renderAll();
-      renderCalendar();
-    };
+    generateTimeOptions();
+    renderAll();
   </script>
 </body>
 </html>
