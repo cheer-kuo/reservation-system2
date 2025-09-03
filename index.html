@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>大貨梯及裝卸碼頭預約系統</title>
+  <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css' rel='stylesheet' />
+  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { text-align: center; }
+    .form-section, .list-section, .admin-section { margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; }
+    label { display: block; margin-top: 10px; }
+    input, select, button { margin-top: 5px; padding: 5px; }
+    .hidden { display: none; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    #calendar {
+      max-width: 900px;
+      margin: 40px auto;
+      height: 650px;
+    }
+  </style>
+</head>
+<body>
+  <h1>大貨梯及裝卸碼頭預約系統</h1>
+
+  <div id="calendar"></div>
+
+  <div class="form-section">
+    <h2>新增預約</h2>
+    <label>場地:
+      <select id="venue">
+        <option value="大貨梯">大貨梯</option>
+        <option value="裝卸碼頭">裝卸碼頭</option>
+      </select>
+    </label>
+    <label>日期: <input type="date" id="date"></label>
+    <label>開始時間:
+      <select id="startTime"></select>
+    </label>
+    <label>結束時間:
+      <select id="endTime"></select>
+    </label>
+    <label>使用單位: <input type="text" id="unit"></label>
+    <label>預約者: <input type="text" id="reserver"></label>
+    <label>聯絡人電話: <input type="text" id="phone"></label>
+    <label>預約密碼: <input type="password" id="resPassword"></label>
+    <button onclick="addReservation()">新增</button>
+  </div>
+
+  <div class="list-section">
+    <h2>所有預約</h2>
+    <label>選擇日期查看: <input type="date" id="filterDate" onchange="renderAll()"></label>
+    <label>選擇場地查看:
+      <select id="filterVenue" onchange="renderAll()">
+        <option value="">全部</option>
+        <option value="大貨梯">大貨梯</option>
+        <option value="裝卸碼頭">裝卸碼頭</option>
+      </select>
+    </label>
+    <table id="reservationTable">
+      <thead>
+        <tr><th>日期</th><th>場地</th><th>時間</th><th>使用單位</th><th>預約者</th><th>電話</th><th>操作</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <button onclick="enterAdminMode()">管理模式</button>
+
+  <div class="admin-section hidden" id="adminSection">
+    <h2>管理模式</h2>
+    <button onclick="exitAdminMode()">登出管理模式</button>
+    <table id="adminTable">
+      <thead>
+        <tr><th>日期</th><th>場地</th><th>時間</th><th>使用單位</th><th>預約者</th><th>電話</th><th>操作</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    const reservations = JSON.parse(localStorage.getItem('reservations') || '[]');
+
+    function generateTimeOptions() {
+      const startSel = document.getElementById('startTime');
+      const endSel = document.getElementById('endTime');
+      for (let h=7; h<=19; h++) {
+        const time = (h<10? '0':'')+h+":00";
+        const opt1 = document.createElement('option'); opt1.value = time; opt1.text = time;
+        const opt2 = document.createElement('option'); opt2.value = time; opt2.text = time;
+        startSel.add(opt1); endSel.add(opt2);
+      }
+    }
+
+    function addReservation() {
+      const venue = document.getElementById('venue').value;
+      const date = document.getElementById('date').value;
+      const start = document.getElementById('startTime').value;
+      const end = document.getElementById('endTime').value;
+      const unit = document.getElementById('unit').value;
+      const reserver = document.getElementById('reserver').value;
+      const phone = document.getElementById('phone').value;
+      const resPassword = document.getElementById('resPassword').value;
+      if (!date || !start || !end || !unit || !reserver || !phone || !resPassword) return alert("請完整填寫");
+
+      const startHour = parseInt(start.split(':')[0]);
+      const endHour = parseInt(end.split(':')[0]);
+      if (endHour <= startHour) return alert("結束時間必須大於開始時間");
+      if (endHour - startHour > 4) return alert("一次最多可預約 4 小時");
+
+      const conflict = reservations.some(r => r.venue===venue && r.date===date &&
+        !(endHour <= parseInt(r.start.split(':')[0]) || startHour >= parseInt(r.end.split(':')[0])));
+      if (conflict) return alert("此時段已被預約");
+
+      reservations.push({venue, date, start, end, unit, reserver, phone, resPassword});
+      localStorage.setItem('reservations', JSON.stringify(reservations));
+      renderAll();
+      renderCalendar();
+      if (isAdmin) renderAdmin();
+    }
+
+    function renderAll() {
+      const filterDate = document.getElementById('filterDate').value;
+      const filterVenue = document.getElementById('filterVenue').value;
+      const tbody = document.querySelector('#reservationTable tbody');
+      tbody.innerHTML = '';
+      reservations
+        .filter(r => (!filterDate || r.date === filterDate) && (!filterVenue || r.venue === filterVenue))
+        .forEach((r,i)=>{
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${r.date}</td><td>${r.venue}</td><td>${r.start} - ${r.end}</td><td>${r.unit}</td><td>${r.reserver}</td><td>${r.phone}</td>
+          <td><button onclick="editOwnReservation(${i})">修改</button></td>`;
+          tbody.appendChild(tr);
+        });
+    }
+
+    function editOwnReservation(i) {
+      const pw = prompt("請輸入此預約的密碼以修改");
+      if (pw !== reservations[i].resPassword) return alert("密碼錯誤");
+
+      const newStart = prompt("新開始時間 (格式 HH:00)", reservations[i].start);
+      const newEnd = prompt("新結束時間 (格式 HH:00)", reservations[i].end);
+      const newUnit = prompt("新使用單位", reservations[i].unit);
+      const newReserver = prompt("新預約者", reservations[i].reserver);
+      const newPhone = prompt("新電話", reservations[i].phone);
+      if (!newStart || !newEnd || !newUnit || !newReserver || !newPhone) return alert("修改失敗，資料不完整");
+
+      const startHour = parseInt(newStart.split(':')[0]);
+      const endHour = parseInt(newEnd.split(':')[0]);
+      if (endHour <= startHour) return alert("結束時間必須大於開始時間");
+      if (endHour - startHour > 4) return alert("一次最多可預約 4 小時");
+
+      const conflict = reservations.some((r,idx) => idx!==i && r.venue===reservations[i].venue && r.date===reservations[i].date &&
+        !(endHour <= parseInt(r.start.split(':')[0]) || startHour >= parseInt(r.end.split(':')[0])));
+      if (conflict) return alert("此時段已被預約");
+
+      reservations[i].start = newStart;
+      reservations[i].end = newEnd;
+      reservations[i].unit = newUnit;
+      reservations[i].reserver = newReserver;
+      reservations[i].phone = newPhone;
+
+      localStorage.setItem('reservations', JSON.stringify(reservations));
+      renderAll();
+      renderCalendar();
+      if (isAdmin) renderAdmin();
+    }
+
+    let isAdmin = false;
+    function enterAdminMode() {
+      const savedPw = localStorage.getItem('adminPassword');
+      if (!savedPw) {
+        const pw = prompt("首次使用，請設定管理密碼");
+        if (!pw) return;
+        localStorage.setItem('adminPassword', pw);
+        alert("管理密碼已設定");
+        isAdmin = true;
+        document.getElementById('adminSection').classList.remove('hidden');
+        renderAdmin();
+      } else {
+        const pw = prompt("請輸入管理密碼");
+        if (pw===savedPw) {
+          isAdmin = true;
+          document.getElementById('adminSection').classList.remove('hidden');
+          renderAdmin();
+        } else {
+          alert("密碼錯誤");
+        }
+      }
+    }
+
+    function exitAdminMode() {
+      isAdmin = false;
+      document.getElementById('adminSection').classList.add('hidden');
+    }
+
+    function renderAdmin() {
+      const tbody = document.querySelector('#adminTable tbody');
+      tbody.innerHTML = '';
+      reservations.forEach((r,i)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.date}</td><td>${r.venue}</td><td>${r.start} - ${r.end}</td><td>${r.unit}</td><td>${r.reserver}</td><td>${r.phone}</td>
+        <td><button onclick="deleteReservation(${i})">刪除</button></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function deleteReservation(i) {
+      if (!confirm("確定刪除?")) return;
+      reservations.splice(i,1);
+      localStorage.setItem('reservations', JSON.stringify(reservations));
+      renderAll();
+      renderCalendar();
+      renderAdmin();
+    }
+
+    let calendar;
+    function renderCalendar() {
+      const calendarEl = document.getElementById('calendar');
+      if (calendar) calendar.destroy();
+      const events = reservations.map(r => ({
+        title: `${r.venue} (${r.unit})`,
+        start: `${r.date}T${r.start}`,
+        end: `${r.date}T${r.end}`
+      }));
+      calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        height: 'auto',
+        events: events
+      });
+      calendar.render();
+    }
+
+    window.onload = function() {
+      generateTimeOptions();
+      renderAll();
+      renderCalendar();
+    };
+  </script>
+</body>
+</html>
